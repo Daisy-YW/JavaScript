@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>MVVM实现</title>
+</head>
+<body>
+    <div id="app">
+        <input type="text" v-model="text" id="a">
+        {{text}}
+    </div>
+    <script>
+        //1- complie解析模板指令
+        function compile(node,vm){
+            var reg = /\{\{(.*)\}\}/;
+            //使用nodeType解析当前node类型
+            if(node.nodeType === 1){
+                var attr = node.attributes;
+                //循环属性数组,解析属性
+                for(var i = 0; i < attr.length; i++){
+                    if(attr[i].nodeName == "v-model"){
+                        var name = attr[i].nodeValue;         //获取v-model绑定的属性名
+                        node.addEventListener("input",function(e){
+                            //给相应的data属性赋值,进而触发该属性的set方法
+                            vm[name] = e.target.value;
+                        })
+                        // node.value = vm.data[name];     //将data的值赋给该node
+                        node.value = vm[name];     //将data的值赋给该node
+                        node.removeAttribute('v-model');
+                    }
+                }
+            }
+            if(node.nodeType === 3){
+              if(reg.test(node.nodeValue)){
+                  var name = RegExp.$1;     //获取匹配到的字符串
+                  name = name.trim();       //两边祛除空白字符
+                //   node.nodeValue = vm.data[name];    //将data的值赋给该node
+                //   node.nodeValue = vm[name];    //将data的值赋给该node
+                  new Watcher(vm,node,name);
+              }   
+            }   
+        }
+        
+        //1- 创建文档片段函数,节省DOM操作,提高页面速度与性能
+        function nodeToFragment(node,vm){
+            var flag = document.createDocumentFragment();
+            var child;
+            while (child = node.firstChild){
+                compile(child,vm);
+                flag.appendChild(child);    //将子节点劫持到文档片段中
+            }
+            return flag;
+        }
+
+        //2- 实现双向绑定,触发input事件,在获取输入框的value并复制给vm实例的text属性
+        function defineReactive(obj,key,val){
+            var dep = new Dep();
+            Object.defineProperty(obj,key,{
+                get:function(){
+                    //添加订阅者watcher到主题对象Dep
+                    if(Dep.target) dep.addSub(Dep.target);
+                    return val
+                },
+                set:function(newValue){
+                    if(newValue === val) return
+                    val = newValue;
+                    console.log(val);    //方便查看效果
+                    //发出通知,已变换内容
+                    dep.notify();
+                }
+            })
+        }
+        function observe (obj,vm){
+            Object.keys(obj).forEach(function(key){
+                defineReactive(vm,key,obj[key]);
+            })
+        }
+
+        // 3- 数据双向绑定
+        //watcher订阅者
+        function Watcher(vm,node,name){
+            Dep.target = this;
+            this.name = name;
+            this.node = node;
+            this.vm = vm;
+            this.update();
+            Dep.target = null;
+        }
+        Watcher.prototype = {
+            update:function(){
+                this.get();
+                this.node.nodeValue = this.value;
+            },
+            //获取data中的属性值
+            get:function(){
+                this.value = this.vm[this.name];        //触发相应属性的get
+            }
+        }
+         //主题对象dep
+        function Dep(){
+            this.subs = [];
+        }
+        Dep.prototype = {
+            addSub:function(sub){
+                this.subs.push(sub);
+            },
+            notify:function(){
+                this.subs.forEach(function(sub){
+                    sub.update();
+                })
+            }
+        }
+
+        //创建Vue函数
+        function Vue(options){
+            this.data = options.data;
+
+            var data = this.data;
+            observe(data,this);
+
+            var id = options.el;
+            var dom = nodeToFragment(document.getElementById(id),this);
+            //编译完成功能后,将dom返回到app中
+            document.getElementById(id).appendChild(dom)
+        }
+
+        //实例化Vue对象,检验是否成功
+        var vm = new Vue({
+            //这里不要使用"#app",代码并未对#进行筛选排查
+            el:"app",
+            data:{
+                text:"hello world"
+            }
+        })
+    </script>
+</body>
+</html>

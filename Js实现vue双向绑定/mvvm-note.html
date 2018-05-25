@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>双向绑定实现</title>
+</head>
+<body>
+
+    <div id="app">
+        <input type="text" v-model="text">
+        {{text}}
+    </div>
+    <script>
+
+       /*  
+            关于documentFragment的了解
+        var dom = nodeToFragment(document.getElementById("app"));
+        console.log(dom);
+
+        function nodeToFragment(node){
+            var flag = document.createDocumentFragment();
+            var child;
+            while(child = node.firstChild){
+                console.log(child = node.firstChild);     
+                flag.appendChild(child);   //截取node的所有子节点
+            }
+            return flag;
+        }
+
+        document.getElementById("app").appendChild(dom); */
+
+
+        //数据初始化绑定
+        function compile(node,vm){
+            var reg  = /\{\{(.*)\}\}/;
+            //nodeType,节点类型
+            console.log("node",node.nodeType);
+            if(node.nodeType === 1){
+                var attr = node.attributes;
+                for(var i = 0; i<attr.length;i++){
+                    if(attr[i].nodeName == "v-model"){
+                        var name = attr[i].nodeValue;   //获取v-model绑定的属性名
+                       /*  //第一步
+                        node.value = vm.data[name];     //将data的值赋给该node */                    
+                        //第二步修改内容
+                        node.addEventListener('input',function(e){
+                            vm[name] = e.target.value;
+                        })
+                        node.value = vm[name];    //将data的值赋给该node
+
+                        node.removeAttribute('v-model');
+                    }
+                }
+            }
+            if(node.nodeType === 3){
+                if(reg.test(node.nodeValue)){
+                    var name = RegExp.$1;            //获取匹配到的字符串
+                    name = name.trim();              //trim()去除字符串两遍的空白
+                    /* //第一步
+                    node.nodeValue = vm.data[name];     //将data的值赋给该node */
+                    //第二步修改内容
+                    // node.nodeValue = vm[name];
+                    //第三步修改内容,这里调用Watcher方法
+                    new Watcher(vm,node,name);
+                    //在编译HTML过程中,为每个与data关联的节点生成一个watcher.Watcher函数中发生了什么?
+                    //请往下看
+                }
+            }
+        }
+        
+        function nodeToFragment (node,vm){
+            //documentFragment  /dɑkjəmənt//'fræɡmənt/
+            var flag = document.createDocumentFragment();
+            var child;
+            while(child = node.firstChild){
+                compile(child,vm);
+                flag.appendChild(child);
+            }
+            return flag;
+        }
+
+
+        
+        //当前已完成任务一
+
+        //任务二:响应式数据
+        //任务二的实现思路:当我们在输入框输入数据的时候,首先触发input事件(或者keyup/change事件),在相应的时间处理程序中,我们获取输入框的value并赋值给vm实例的text属性.我们会利用definePropperty将data中的text设置为vm的访问器属性,因此给vm.text赋值,会触发set放大,在set方法中主要做两件事,第一是更新属性的值,第二留到任务三再说
+
+        function defineReactive(obj,key,val){
+            //这里实例化Dep,为了方便使用原型链prototype上的数据
+            //Dep公有属性上面有两个函数addSub和notify
+            var dep = new Dep();
+            //defineProperty   /dɪ'faɪn/ /'prɒpətɪ/ 
+            //obj=Vue对象,key=text, Val="data下text的值"
+            //这里使用dedineProperty实现双向绑定,针对Vue对象下面的text进行get与set操作
+            Object.defineProperty(obj,key,{
+                //获取说句
+                get:function(){
+                    //第三次增添的内容
+                    //Dep.target是Watcher内容
+                    if(Dep.target)dep.addSub(Dep.target);
+                    return val
+                },
+                //更新数据
+                set:function(newValue){
+                    //如果新内容与旧内容没有变化,结束流程
+                    if(newValue === val) return
+                    //否则设置val = newValue
+                    val = newValue;
+                    console.log(val);     //方便查看效果
+                    //第三次增添内容
+                    //并作为发布者发出通知,告知内容已发生变化
+                    dep.notify();
+                }
+            })
+        }
+        function observe(obj,vm){
+            //传入的Vue的data内容h和Vue的参数与Vue对象
+            console.log("observer传入的参数",obj,vm);
+            Object.keys(obj).forEach(function(key){
+                //vm为Vue对象,并将key-text传入,以及值传入definReactive函数              
+                defineReactive(vm,key,obj[key]);
+            })
+        }
+
+       
+
+        //此时watch正在做
+        //先将自己赋给一个全局变量 Dep.target
+        //其次,执行了updata方法,进而执行了get方法,get的方法读取了vm的访问器属性,从而触发了访问器属性的get方法,get方法中将该watcher添加到了对应访问器属性的dep中
+        //再次,获取属性的值,然后更新视图
+        //最后,将Dep.target设为空值,因为他是全局变量,也是watcher与dep关联的唯一桥梁,任何时刻都必须保证Dep.target只有一个值
+
+
+        //订阅者Watcher设置自身数据,并自身调用update方法,进行获取数据与自身的数据保持同步
+        function Watcher(vm,node,name){
+            //自定义Dep的target属性
+            Dep.target = this;
+            console.log("Dep",{Dep});
+            this.name = name;
+            this.node = node;
+            this.vm = vm;
+            this.update();
+        }
+        //设置watcher的共有属性,update与get
+        Watcher.prototype = {
+            update: function(){
+                //在这里调用自身的get方法
+                this.get();
+                //将自身的node下的nodeValue设置为Value
+                //为了将文本框内的内容同步到HTMl中
+                this.node.nodeValue = this.value;
+            },
+            //获取data中的属性值
+            get:function(){
+                this.value = this.vm[this.name];   //触发相应的get属性
+            }
+        }
+        //主题对象
+        function Dep(){
+            //设置subs为订阅者列表
+            this.subs = [];
+            console.log("dep.subs",this.subs);  //输出Watcher,即前面说的Watch先将自己复制给一个全局变量Dep.target
+        }
+        //设置Dep
+        Dep.prototype = {
+            addSub: function(sub){
+            //    this.subs[0]=sub;
+            //////////////////////////////////////////////
+            //这里不是很明白,每次修改内容,sub会一直不停给的往里面添加内容,为什么不用sub[0]?
+               this.subs.push(sub);
+            },
+            notify: function(){         //劫持到数据变更，并发布消息进行通知
+                this.subs.forEach(function(sub){
+                    // //遍历所有的订阅者，执行订阅者提供的更新方法
+                    sub.update();
+                })
+            }
+        }
+
+
+        //设置Vue函数,参数为options
+        function Vue(options){
+            console.log("Vue函数参数",options);  //实例Vue传进来的参数有el与data
+            //设置deta为参数的data对象属性,方便传入函数进行操作
+            var data =  options.data;;
+            observe(data,this);
+            var id = options.el;
+            //使用DocumentFeagment编译虚拟DOM
+            var dom = nodeToFragment(document.getElementById(id),this);
+            //编译完成后,将dom返回到app中
+            document.getElementById(id).appendChild(dom);
+        }
+
+        var vm = new Vue({
+            el:"app",
+            data:{
+                text: 'hello world'
+            }
+        })
+
+        //第二步完成,在这时,input修改内容的时候.Vue的text值也会同步修改
+
+        //text属性变化了,set方法出发了,但是文本节点内容没有变化,如何让同样绑定到text的文本节点也同步变化? 这里有一个只是点: 订阅发布模式
+        //订阅发布模式(又成为观察者模式),定义了一种一对多的关系,让多个观察者同时监听某一个主题对象,这个主题对象的状态发生改变时就会通知所有观察者对象.
+        //发布者发出通过 => 主题对象收到通知并推送给订阅者 => 订阅者执行相应操作
+
+
+
+       /*  //一个发布者publisher
+        var pub = {
+            publish: function(){
+                dep.notify();
+            }
+        }
+        //三个订阅者subscribers
+        var sub1 = { update : function(){ console.log(1) }};
+        var sub2 = { update : function(){ console.log(2) }};
+        var sub3 = { update : function(){ console.log(3) }};
+
+        //一个主题对象
+        function Dep(){
+            this.subs = [sub1,sub2,sub3];
+        }
+        //prototype  /'protə'taɪp/
+        Dep.prototype.notify = function(){
+            this.subs.forEach(function(sub){
+                sub.updata();
+            })
+        }
+        //发布者发布消息,主题对象执行notify方法,进而触发订阅者执行updata方法
+        var dep = new Dep();
+        pub;publish(); */
+
+        //之前提到的,当set方法触发后做的第二件事就是作为发布者发出通知:"我是属性text,我变了".文本节点则是作为订阅者,在收到消息后执行相应的更新操作
+
+        //第三步   双向绑定的实现
+        //回顾一下,每当new一个Vue,主要做了两件事,第一是监听数据:observe(data),第二个是编译HTML: nodeToFragment(id)
+        //在监听数据的过程中,会对data中的每一个属性生成一个主题对象dep
+        //在编译HTML的过程汇总,会为每个与数据绑定相关的节点生成一个订阅者Matcher,watcher会将自己添加到相应属性的dep中
+        //我们已经实现: 修改输入框内容 => 在事件回调函数中修改属性值 => 触发属性的set方法
+        //接下来我们要实现的是: 发出通知dep.notify() => 触发订阅者updata方法 => 更新视图
+        //这里的关键逻辑是: 如何将watcher添加到关联属性的dep中
+    </script>
+</body>
+</html>

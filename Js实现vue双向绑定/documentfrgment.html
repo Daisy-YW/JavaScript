@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>DocumentFragment</title>
+</head>
+<body>
+    <div id="app">
+        <input type="text" id="a">
+        <span id="b"></span>
+    </div>
+    <script>
+        var dom = nodeToFragment(document.getElementById("app"));
+        console.log(dom);
+
+        function nodeToFragment(node){
+            var flag = document.createDocumentFragment();
+            var child;
+            while(child = node.firstChild){
+                flag.appendChild(child);      //劫持node下的所有子节点
+            }
+            return flag;
+        }
+        //将DocumentFragment中的所有内容返回到app中
+        document.getElementById("app").appendChild(dom);  
+    </script>
+</body>
+</html>

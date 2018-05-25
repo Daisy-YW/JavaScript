@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>极简版双向绑定</title>
+    <style>
+        *{
+            padding:0;
+            margin: 0;
+            box-sizing: border-box;
+            font-family: "微软雅黑";
+            color: #333333;
+        }
+        #page{
+            width: 600px;
+            margin: 0 auto;
+        }
+        #wq_show{
+            width: 600px;
+            padding: 30px 15px;
+            margin: 0 auto;
+            background:rgba(206, 206, 206, 0.2);
+            margin: 20px 0;
+            color: #666;
+        }
+        .font-title{
+            margin: 20px 0;
+        }
+        .title{
+            font-size: 28px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+        <div id="page">
+            <p class="title">极简版双向绑定-defineProperty</p>
+            <input type="text" id="a">
+            <span id="b"></span>
+            <script>
+                var obj = {};
+                Object.defineProperty(obj,"hello",{
+                    set:function(newVal){
+                        document.getElementById("a").value = newVal;
+                        document.getElementById("b").innerHTML = newVal;
+                    }
+                }) 
+                document.addEventListener("keyup",function(e){
+                    obj.hello = e.target.value;
+                })
+            </script>
+
+            <p class="font-title">代码如下:</p>
+
+
+
+            <!-- 代码片段展示 -->
+<xmp id="wq_show"><script>
+        var obj = {};
+        Object.defineProperty(obj,"hello",{
+            set:function(newVal){
+                document.getElementById("a").value = newVal;
+                document.getElementById("b").innerHTML = newVal;
+            }
+        }) 
+        document.addEventListener("keyup",function(e){
+            obj.hello = e.target.value;
+        })
+    </script>
+</xmp>
+
+
+
+
+        </div>
+</body>
+</html>   
